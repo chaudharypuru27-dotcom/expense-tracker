@@ -8,9 +8,13 @@ const balanceDisplay = document.getElementById("balance");
 const searchInput = document.getElementById("searchInput");
 const filterCategory = document.getElementById("filterCategory");
 
-const API_URL = "http://localhost:5000/api/transactions";
+
+// IMPORTANT:
+// Live aur localhost dono par kaam karega
+const API_URL = "/api/transactions";
 
 let allTransactions = [];
+let expenseChart;
 
 
 // ======================================
@@ -58,12 +62,14 @@ expenseForm.addEventListener("submit", async function (event) {
     const type = document.getElementById("type").value;
     const category = document.getElementById("category").value;
 
-     if (!title || !amount || !date || !type || !category) {
+
+    if (!title || !amount || !date || !type || !category) {
 
         alert("Please fill all fields.");
 
         return;
     }
+
 
     try {
 
@@ -76,22 +82,30 @@ expenseForm.addEventListener("submit", async function (event) {
             },
 
             body: JSON.stringify({
-    title,
-    amount,
-    date,
-    type,
-    category
-})
+                title,
+                amount,
+                date,
+                type,
+                category
+            })
 
         });
 
+
         if (!response.ok) {
-            throw new Error("Could not add transaction");
+
+            const errorData = await response.json().catch(() => ({}));
+
+            throw new Error(
+                errorData.message || "Could not add transaction"
+            );
         }
+
 
         expenseForm.reset();
 
         await loadTransactions();
+
 
     } catch (error) {
 
@@ -112,6 +126,7 @@ function displayTransactions(transactions) {
 
     transactionList.innerHTML = "";
 
+
     if (transactions.length === 0) {
 
         transactionList.innerHTML = `
@@ -121,6 +136,7 @@ function displayTransactions(transactions) {
         `;
 
         updateSummary(transactions);
+
         updateExpenseChart(allTransactions);
 
         return;
@@ -129,9 +145,11 @@ function displayTransactions(transactions) {
 
     transactions.forEach(function (transaction) {
 
-        const transactionDiv = document.createElement("div");
+        const transactionDiv =
+            document.createElement("div");
 
         transactionDiv.classList.add("transaction-item");
+
 
         transactionDiv.innerHTML = `
 
@@ -141,15 +159,27 @@ function displayTransactions(transactions) {
 
                 <p>${transaction.category}</p>
 
-                <p>${transaction.date ? new Date(transaction.date).toLocaleDateString("en-IN") : "No date"}</p>
+                <p>
+                    ${
+                        transaction.date
+                            ? new Date(transaction.date)
+                                .toLocaleDateString("en-IN")
+                            : "No date"
+                    }
+                </p>
 
             </div>
+
 
             <div>
 
                 <strong class="${transaction.type}">
 
-                    ${transaction.type === "income" ? "+" : "-"}₹${transaction.amount}
+                    ${
+                        transaction.type === "income"
+                            ? "+"
+                            : "-"
+                    }₹${transaction.amount}
 
                 </strong>
 
@@ -179,12 +209,15 @@ function displayTransactions(transactions) {
 
         `;
 
+
         transactionList.appendChild(transactionDiv);
 
     });
 
 
     updateSummary(transactions);
+
+    updateExpenseChart(allTransactions);
 
 }
 
@@ -195,14 +228,36 @@ function displayTransactions(transactions) {
 
 async function editTransaction(id) {
 
-    const title = prompt("Enter new title:");
+    const transaction =
+        allTransactions.find(t => t._id === id);
+
+
+    if (!transaction) {
+
+        alert("Transaction not found.");
+
+        return;
+    }
+
+
+    const title =
+        prompt(
+            "Enter new title:",
+            transaction.title
+        );
+
 
     if (title === null || title.trim() === "") {
         return;
     }
 
 
-    const amount = prompt("Enter new amount:");
+    const amount =
+        prompt(
+            "Enter new amount:",
+            transaction.amount
+        );
+
 
     if (amount === null || Number(amount) <= 0) {
         return;
@@ -211,31 +266,41 @@ async function editTransaction(id) {
 
     try {
 
-        const response = await fetch(`${API_URL}/${id}`, {
+        const response =
+            await fetch(`${API_URL}/${id}`, {
 
-            method: "PUT",
+                method: "PUT",
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+                headers: {
+                    "Content-Type": "application/json"
+                },
 
-            body: JSON.stringify({
-    title,
-    amount,
-    date,
-    type,
-    category
-})
+                body: JSON.stringify({
 
-        });
+                    title: title.trim(),
+
+                    amount: Number(amount),
+
+                    type: transaction.type,
+
+                    category: transaction.category
+
+                })
+
+            });
 
 
         if (!response.ok) {
-            throw new Error("Could not update transaction");
+
+            throw new Error(
+                "Could not update transaction"
+            );
+
         }
 
 
         await loadTransactions();
+
 
     } catch (error) {
 
@@ -254,21 +319,36 @@ async function editTransaction(id) {
 
 async function deleteTransaction(id) {
 
+    const confirmDelete =
+        confirm("Delete this transaction?");
+
+
+    if (!confirmDelete) {
+        return;
+    }
+
+
     try {
 
-        const response = await fetch(`${API_URL}/${id}`, {
+        const response =
+            await fetch(`${API_URL}/${id}`, {
 
-            method: "DELETE"
+                method: "DELETE"
 
-        });
+            });
 
 
         if (!response.ok) {
-            throw new Error("Could not delete transaction");
+
+            throw new Error(
+                "Could not delete transaction"
+            );
+
         }
 
 
         await loadTransactions();
+
 
     } catch (error) {
 
@@ -288,7 +368,10 @@ async function deleteTransaction(id) {
 function applyFilters() {
 
     const searchText =
-        searchInput.value.toLowerCase().trim();
+        searchInput.value
+            .toLowerCase()
+            .trim();
+
 
     const selectedCategory =
         filterCategory.value;
@@ -308,7 +391,10 @@ function applyFilters() {
                 transaction.category === selectedCategory;
 
 
-            return matchesSearch && matchesCategory;
+            return (
+                matchesSearch &&
+                matchesCategory
+            );
 
         });
 
@@ -318,12 +404,18 @@ function applyFilters() {
 }
 
 
-// Search listener
-searchInput.addEventListener("input", applyFilters);
+// Search
+searchInput.addEventListener(
+    "input",
+    applyFilters
+);
 
 
-// Category listener
-filterCategory.addEventListener("change", applyFilters);
+// Category
+filterCategory.addEventListener(
+    "change",
+    applyFilters
+);
 
 
 // ======================================
@@ -341,14 +433,16 @@ function updateSummary(transactions) {
 
         if (transaction.type === "income") {
 
-            totalIncome += Number(transaction.amount);
+            totalIncome +=
+                Number(transaction.amount);
 
         }
 
 
         if (transaction.type === "expense") {
 
-            totalExpense += Number(transaction.amount);
+            totalExpense +=
+                Number(transaction.amount);
 
         }
 
@@ -374,41 +468,46 @@ function updateSummary(transactions) {
 
 
 // ======================================
-// START
-// ======================================
-
-loadTransactions();
-// ======================================
 // EXPENSE CHART
 // ======================================
-
-let expenseChart;
 
 function updateExpenseChart(transactions) {
 
     const categoryTotals = {};
 
+
     transactions.forEach(function (transaction) {
 
         if (transaction.type === "expense") {
 
-            const category = transaction.category;
+            const category =
+                transaction.category;
+
 
             categoryTotals[category] =
                 (categoryTotals[category] || 0) +
                 Number(transaction.amount);
+
         }
+
     });
 
 
-    const categories = Object.keys(categoryTotals);
+    const categories =
+        Object.keys(categoryTotals);
 
-    const amounts = Object.values(categoryTotals);
+
+    const amounts =
+        Object.values(categoryTotals);
 
 
-    const canvas = document.getElementById("expenseChart");
+    const canvas =
+        document.getElementById("expenseChart");
 
-    if (!canvas) return;
+
+    if (!canvas) {
+        return;
+    }
 
 
     if (expenseChart) {
@@ -416,35 +515,46 @@ function updateExpenseChart(transactions) {
     }
 
 
-    expenseChart = new Chart(canvas, {
+    expenseChart =
+        new Chart(canvas, {
 
-        type: "doughnut",
+            type: "doughnut",
 
-        data: {
+            data: {
 
-            labels: categories,
+                labels: categories,
 
-            datasets: [{
-                label: "Expenses",
-                data: amounts
-            }]
+                datasets: [{
 
-        },
+                    label: "Expenses",
 
-        options: {
+                    data: amounts
 
-            responsive: true,
+                }]
 
-            plugins: {
+            },
 
-                legend: {
-                    position: "bottom"
+            options: {
+
+                responsive: true,
+
+                plugins: {
+
+                    legend: {
+                        position: "bottom"
+                    }
+
                 }
 
             }
 
-        }
-
-    });
+        });
 
 }
+
+
+// ======================================
+// START APP
+// ======================================
+
+loadTransactions();
