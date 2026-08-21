@@ -1,6 +1,9 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 
 const app = express();
 
@@ -8,8 +11,18 @@ app.use(cors());
 app.use(express.json());
 
 
-// MongoDB Connection
-mongoose.connect("mongodb://127.0.0.1:27017/expenseTracker")
+// ===============================
+// FRONTEND FILES
+// ===============================
+
+app.use(express.static(path.join(__dirname, "..")));
+
+
+// ===============================
+// MONGODB CONNECTION
+// ===============================
+
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
         console.log("MongoDB connected successfully ✅");
     })
@@ -19,8 +32,12 @@ mongoose.connect("mongodb://127.0.0.1:27017/expenseTracker")
     });
 
 
-// Transaction Schema
+// ===============================
+// TRANSACTION SCHEMA
+// ===============================
+
 const transactionSchema = new mongoose.Schema({
+
     title: {
         type: String,
         required: true
@@ -30,10 +47,11 @@ const transactionSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+
     date: {
-    type: Date,
-    required: true
-},
+        type: Date,
+        required: true
+    },
 
     type: {
         type: String,
@@ -44,32 +62,56 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         required: true
     }
+
 });
 
 
-// Transaction Model
+// ===============================
+// TRANSACTION MODEL
+// ===============================
+
 const Transaction = mongoose.model(
     "Transaction",
     transactionSchema
 );
 
 
-// Test Route
+// ===============================
+// HOME ROUTE
+// ===============================
+
 app.get("/", (req, res) => {
-    res.send("Expense Tracker Backend is Running 🚀");
+
+    res.sendFile(
+        path.join(__dirname, "..", "index.html")
+    );
+
+});
+app.get("/index.html", (req, res) => {
+
+    res.sendFile(
+        path.join(__dirname, "..", "index.html")
+    );
+
 });
 
 
-// Get Transactions
+// ===============================
+// GET TRANSACTIONS
+// ===============================
+
 app.get("/api/transactions", async (req, res) => {
 
     try {
 
-        const transactions = await Transaction.find();
+        const transactions = await Transaction.find()
+            .sort({ date: -1 });
 
         res.json(transactions);
 
     } catch (error) {
+
+        console.log(error);
 
         res.status(500).json({
             message: "Could not fetch transactions"
@@ -80,31 +122,59 @@ app.get("/api/transactions", async (req, res) => {
 });
 
 
-// Add Transaction
+// ===============================
+// ADD TRANSACTION
+// ===============================
+
 app.post("/api/transactions", async (req, res) => {
 
     try {
 
-        const { title, amount, date, type, category } = req.body;
+        const {
+            title,
+            amount,
+            date,
+            type,
+            category
+        } = req.body;
 
-        if (!title || !amount || !date || !type || !category) {
+
+        if (
+            !title ||
+            !amount ||
+            !date ||
+            !type ||
+            !category
+        ) {
 
             return res.status(400).json({
                 message: "Please fill all fields"
             });
 
         }
-        const transaction = new Transaction({
-    title,
-    amount: Number(amount),
-    date,
-    type,
-    category
-});
 
-        const savedTransaction = await transaction.save();
+
+        const transaction = new Transaction({
+
+            title,
+
+            amount: Number(amount),
+
+            date,
+
+            type,
+
+            category
+
+        });
+
+
+        const savedTransaction =
+            await transaction.save();
+
 
         res.status(201).json(savedTransaction);
+
 
     } catch (error) {
 
@@ -118,26 +188,46 @@ app.post("/api/transactions", async (req, res) => {
 
 });
 
-// Update Transaction
+
+// ===============================
+// UPDATE TRANSACTION
+// ===============================
+
 app.put("/api/transactions/:id", async (req, res) => {
 
     try {
 
-        const { title, amount, type, category } = req.body;
+        const {
+            title,
+            amount,
+            type,
+            category
+        } = req.body;
 
-        const updatedTransaction = await Transaction.findByIdAndUpdate(
-            req.params.id,
-            {
-                title,
-                amount: Number(amount),
-                type,
-                category
-            },
-            {
-                new: true,
-                runValidators: true
-            }
-        );
+
+        const updatedTransaction =
+            await Transaction.findByIdAndUpdate(
+
+                req.params.id,
+
+                {
+                    title,
+
+                    amount: Number(amount),
+
+                    type,
+
+                    category
+                },
+
+                {
+                    new: true,
+
+                    runValidators: true
+                }
+
+            );
+
 
         if (!updatedTransaction) {
 
@@ -147,7 +237,9 @@ app.put("/api/transactions/:id", async (req, res) => {
 
         }
 
+
         res.json(updatedTransaction);
+
 
     } catch (error) {
 
@@ -160,18 +252,39 @@ app.put("/api/transactions/:id", async (req, res) => {
     }
 
 });
-// Delete Transaction
+
+
+// ===============================
+// DELETE TRANSACTION
+// ===============================
+
 app.delete("/api/transactions/:id", async (req, res) => {
 
     try {
 
-        await Transaction.findByIdAndDelete(req.params.id);
+        const deletedTransaction =
+            await Transaction.findByIdAndDelete(
+                req.params.id
+            );
+
+
+        if (!deletedTransaction) {
+
+            return res.status(404).json({
+                message: "Transaction not found"
+            });
+
+        }
+
 
         res.json({
             message: "Transaction deleted successfully"
         });
 
+
     } catch (error) {
+
+        console.log(error);
 
         res.status(500).json({
             message: "Could not delete transaction"
@@ -182,11 +295,17 @@ app.delete("/api/transactions/:id", async (req, res) => {
 });
 
 
-// Start Server
-const PORT = 5000;
+// ===============================
+// START SERVER
+// ===============================
+
+const PORT = process.env.PORT || 5000;
+
 
 app.listen(PORT, () => {
 
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(
+        `Server running on port ${PORT}`
+    );
 
 });
